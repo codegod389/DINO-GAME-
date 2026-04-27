@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Dino Jump | Combo & Progressive Speed</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: radial-gradient(circle at 30% 10%, #0b1120, #010101);
+            font-family: 'Courier New', 'Fira Code', monospace;
+            margin: 0;
+            padding: 24px;
+        }
+
+        #gameWrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 400px;
+            border-radius: 32px;
+            overflow: hidden;
+            box-shadow: 0 30px 40px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 180, 40, 0.3);
+            background-color: #eef2ff;
+            transition: filter 0.2s ease;
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* --- refined overlay (no emojis) --- */
+        #scoreDisplay {
+            position: absolute;
+            top: 18px;
+            right: 24px;
+            font-size: 36px;
+            font-weight: 800;
+            color: #2d3e2b;
+            font-family: 'Courier New', monospace;
+            z-index: 15;
+            text-shadow: 3px 3px 0 #f9eec1;
+            letter-spacing: 3px;
+            background: rgba(0,0,0,0.08);
+            padding: 4px 16px;
+            border-radius: 40px;
+            backdrop-filter: blur(4px);
+        }
+
+        #highScoreDisplay {
+            position: absolute;
+            top: 68px;
+            right: 24px;
+            font-size: 16px;
+            font-weight: bold;
+            background: #1e1a2fe0;
+            backdrop-filter: blur(8px);
+            padding: 6px 16px;
+            border-radius: 120px;
+            z-index: 15;
+            font-family: monospace;
+            letter-spacing: 0.8px;
+            color: #ffdd99;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(255,200,100,0.5);
+        }
+
+        .highscore-svg {
+            width: 18px;
+            height: 18px;
+            filter: drop-shadow(0 0 2px gold);
+        }
+
+        #comboDisplay {
+            position: absolute;
+            bottom: 80px;
+            left: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            background: linear-gradient(125deg, #111, #2a2000);
+            backdrop-filter: blur(8px);
+            padding: 6px 18px;
+            border-radius: 48px;
+            font-family: monospace;
+            z-index: 15;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+            border: 1px solid #ffaa44;
+            color: #ffc285;
+        }
+
+        .combo-flame {
+            width: 24px;
+            height: 24px;
+            filter: drop-shadow(0 0 3px #ff6600);
+        }
+
+        #title {
+            position: absolute;
+            top: 15px;
+            left: 24px;
+            font-size: 32px;
+            font-weight: 900;
+            background: linear-gradient(145deg, #e25822, #f5b042);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            z-index: 15;
+            letter-spacing: 2px;
+            filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.2));
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 18px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(12px);
+            color: #ffe5b4;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 6px 14px;
+            border-radius: 60px;
+            z-index: 15;
+            font-family: monospace;
+            border-left: 3px solid #f7b32b;
+        }
+
+        .game-controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            align-items: center;
+            background: rgba(10, 20, 35, 0.75);
+            backdrop-filter: blur(14px);
+            padding: 10px 28px;
+            border-radius: 80px;
+            border: 1px solid rgba(255, 210, 90, 0.4);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+        }
+
+        .ctrl-btn, .difficulty-btn {
+            background: #1e2a38;
+            border: none;
+            color: #f2eed7;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            padding: 8px 22px;
+            border-radius: 56px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.2);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ctrl-btn svg, .difficulty-btn svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .ctrl-btn:hover, .difficulty-btn:hover {
+            transform: translateY(-2px);
+            background: #e67e22;
+            color: white;
+            box-shadow: 0 8px 18px #e67e2266;
+        }
+
+        .difficulty-group {
+            display: flex;
+            gap: 12px;
+            background: rgba(0,0,0,0.4);
+            padding: 5px 18px;
+            border-radius: 60px;
+            backdrop-filter: blur(4px);
+        }
+
+        .difficulty-btn.active {
+            background: #f39c12;
+            color: #0f1b22;
+            box-shadow: 0 0 12px #ffc107;
+        }
+
+        .difficulty-btn.active svg {
+            stroke: #0f1b22;
+            fill: #0f1b22;
+        }
+
+        #pauseOverlayMsg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(12px);
+            color: #ffd966;
+            font-size: 28px;
+            font-weight: bold;
+            padding: 18px 36px;
+            border-radius: 70px;
+            z-index: 25;
+            font-family: monospace;
+            white-space: nowrap;
+            border: 2px solid #ffa559;
+            letter-spacing: 3px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
+        }
+
+        .pause-svg {
+            width: 32px;
+            height: 32px;
+            fill: #ffd966;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: #03050cee;
+            backdrop-filter: blur(16px);
+            padding: 32px 48px;
+            border-radius: 56px;
+            display: none;
+            z-index: 30;
+            border: 2px solid #f39c12;
+            box-shadow: 0 25px 40px rgba(0, 0, 0, 0.7);
+            min-width: 300px;
+        }
+
+        #gameOver h2 {
+            color: #f57c3a;
+            margin-bottom: 20px;
+            font-size: 34px;
+            font-weight: 900;
+            letter-spacing: 2px;
+        }
+
+        #gameOver p {
+            color: #ffdfa5;
+            font-size: 20px;
+            margin: 12px 0;
+            font-weight: bold;
+        }
+
+        #restartBtn {
+            margin-top: 24px;
+            padding: 12px 28px;
+            background: #e67e22;
+            border: none;
+            border-radius: 60px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 18px;
+            color: white;
+            transition: 0.2s;
+        }
+
+        #restartBtn:hover {
+            background: #ff9a3c;
+            transform: scale(1.02);
+        }
+
+        @keyframes comboPop {
+            0% { transform: scale(1); background: #ff8c00; }
+            50% { transform: scale(1.08); background: #ff6600; color: #feffb0; }
+            100% { transform: scale(1); background: linear-gradient(125deg, #111, #2a2000);}
+        }
+
+        .combo-blink {
+            animation: comboPop 0.2s ease;
+        }
+    </style>
+</head>
+<body>
+<div id="gameWrapper">
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div id="title">DINO JUMP</div>
+        <div id="scoreDisplay">00000</div>
+        <div id="highScoreDisplay">
+            <svg class="highscore-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M12 2L15 9H22L16.5 13.5L19 21L12 16L5 21L7.5 13.5L2 9H9L12 2Z" fill="rgba(255,215,0,0.3)" stroke="#ffcc55"/>
+                <circle cx="12" cy="11" r="1.5" fill="#ffcc55" stroke="none"/>
+            </svg>
+            <span>HI: 00000</span>
+        </div>
+        <div id="comboDisplay">
+            <svg class="combo-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M12 2C10 6 6 9 6 13C6 16.5 9 19 12 19C15 19 18 16.5 18 13C18 9 14 6 12 2Z" fill="#ff7e33" stroke="#ff4400"/>
+                <path d="M12 6C11 9 9 11 9 13.5C9 15.5 10.5 17 12 17C13.5 17 15 15.5 15 13.5C15 11 13 9 12 6Z" fill="#ffcc55" stroke="none"/>
+                <path d="M12 9 L12.8 11.5 L15 12 L13 13.7 L13.6 16 L12 14.5 L10.4 16 L11 13.7 L9 12 L11.2 11.5 Z" fill="#ffec80" stroke="none"/>
+            </svg>
+            <span>x1.00</span>
+        </div>
+        <div id="instructions">▲ SPACE / UP = JUMP  •  ▼ DOWN = DUCK</div>
+        <div id="pauseOverlayMsg" style="display: none;">
+            <svg class="pause-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/>
+                <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/>
+            </svg>
+            <span>PAUSED</span>
+        </div>
+        <div id="gameOver">
+            <h2>GAME OVER</h2>
+            <p>YOUR SCORE: <span id="finalScore">00000</span></p>
+            <p>BEST: <span id="highScore">00000</span></p>
+            <button id="restartBtn">▶ PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <div class="game-controls">
+        <div class="difficulty-group">
+            <button class="difficulty-btn" data-diff="easy">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L9.5 8.5L3 9L8 13L6 19L12 15.5L18 19L16 13L21 9L14.5 8.5L12 2Z"/></svg>
+                EASY
+            </button>
+            <button class="difficulty-btn active" data-diff="normal">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 4L13 10L19 10.5L14.5 14.5L16 21L12 17L8 21L9.5 14.5L5 10.5L11 10L12 4Z"/></svg>
+                NORMAL
+            </button>
+            <button class="difficulty-btn" data-diff="hard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L14 9H21L15.5 13.5L18 21L12 16.5L6 21L8.5 13.5L3 9H10L12 2Z" fill="rgba(255,70,0,0.2)"/></svg>
+                HARD
+            </button>
+        </div>
+        <button id="pauseBtn" class="ctrl-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+            PAUSE
+        </button>
+        <button id="fullscreenBtn" class="ctrl-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 3H5C3.89543 3 3 3.89543 3 5V8M21 8V5C21 3.89543 20.1046 3 19 3H16M16 21H19C20.1046 21 21 20.1046 21 19V16M3 16V19C3 20.1046 3.89543 21 5 21H8"/><path d="M10 10L14 14M14 10L10 14"/></svg>
+            FULLSCREEN
+        </button>
+    </div>
+</div>
+
+<script>
+    (function(){
+        if(window.Telegram?.WebApp){
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreSpan = document.getElementById('scoreDisplay');
+        const highScoreSpan = document.getElementById('highScoreDisplay').querySelector('span');
+        const comboWrapper = document.getElementById('comboDisplay');
+        const comboValueSpan = comboWrapper.querySelector('span');
+        const gameOverDiv = document.getElementById('gameOver');
+        const finalScoreSpan = document.getElementById('finalScore');
+        const highScoreFinalSpan = document.getElementById('highScore');
+        const restartBtn = document.getElementById('restartBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const instructionsDiv = document.getElementById('instructions');
+        const titleElem = document.getElementById('title');
+        const pauseOverlay = document.getElementById('pauseOverlayMsg');
+
+        // ---- same pixel assets ----
+        const dinoImg = new Image();
+        const cactus1Img = new Image();
+        const cactus2Img = new Image();
+        const cactus3Img = new Image();
+        const birdImg = new Image();
+        const groundImg = new Image();
+        const moonImg = new Image();
+        const starImg = new Image();
+        dinoImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDQiIGhlaWdodD0iNDciIHZpZXdCb3g9IjAgMCA0NCA0NyIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ0IiBoZWlnaHQ9IjQ3IiBmaWxsPSIjNTM1MzUzIiByeD0iNCIvPgo8cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSI4IiBoZWlnaHQ9IjEwIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIyNiIgeT0iMTAiIHdpZHRoPSI4IiBoZWlnaHQ9IjEwIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSI1IiB5PSI0MCIgd2lkdGg9IjYiIGhlaWdodD0iMTIiIGZpbGw9IiM1MzUzNTMiIHJ4PSIyIi8+CjxyZWN0IHg9IjMzIiB5PSI0MCIgd2lkdGg9IjYiIGhlaWdodD0iMTIiIGZpbGw9IiM1MzUzNTMiIHJ4PSIyIi8+Cjwvc3ZnPgo=';
+        cactus1Img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAyMCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzZhYzUwIiByeD0iNCIvPgo8cmVjdCB4PSI3IiB5PSIyIiB3aWR0aD0iNiIgaGVpZ2h0PSIyMCIgZmlsbD0iIzI2OGEzZCIgcnk9IjMiLz4KPHJlY3QgeD0iMiIgeT0iNSIgd2lkdGg9IjYiIGhlaWdodD0iMTUiIGZpbGw9IiMyNjhhM2QiIHJ5PSIzIi8+CjxyZWN0IHg9IjEyIiB5PSI4IiB3aWR0aD0iNiIgaGVpZ2h0PSIxMiIgZmlsbD0iIzI2OGEzZCIgcnk9IjMiLz4KPC9zdmc+Cg==';
+        cactus2Img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzUiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAzNSA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjM1IiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzZhYzUwIiByeD0iNCIvPgo8cmVjdCB4PSI1IiB5PSIzIiB3aWR0aD0iOCIgaGVpZ2h0PSIyNSIgZmlsbD0iIzI2OGEzZCIgcnk9IjQiLz4KPHJlY3QgeD0iMTUiIHk9IjciIHdpZHRoPSI4IiBoZWlnaHQ9IjIwIiBmaWxsPSIjMjY4YTNkIiByeT0iNCIvPgo8cmVjdCB4PSIyNSIgeT0iNCIgd2lkdGg9IjgiIGhlaWdodD0iMjIiIGZpbGw9IiMyNjhhM2QiIHJ5PSI0Ii8+Cjwvc3ZnPgo=';
+        cactus3Img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAyNSA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI1IiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzZhYzUwIiByeD0iNCIvPgo8cmVjdCB4PSIyIiB5PSI1IiB3aWR0aD0iNyIgaGVpZ2h0PSIyMCIgZmlsbD0iIzI2OGEzZCIgcnk9IjMiLz4KPHJlY3QgeD0iMTEiIHk9IjIiIHdpZHRoPSI3IiBoZWlnaHQ9IjIzIiBmaWxsPSIjMjY4YTNkIiByeT0iMyIvPgo8cmVjdCB4PSIyMCIgeT0iOCIgd2lkdGg9IjciIGhlaWdodD0iMTUiIGZpbGw9IiMyNjhhM2QiIHJ5PSIzIi8+Cjwvc3ZnPgo=';
+        birdImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjUiIHZpZXdCb3g9IjAgMCA0MCAyNSIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIwIDJMNDAgMTIuNUwyMCAyM0wwIDEyLjVMMjAgMloiIGZpbGw9IiM1MzUzNTMiLz4KPGNpcmNsZSBjeD0iMjgiIGN5PSIxMC41IiByPSIzIiBmaWxsPSIjMzMzIi8+CjxwYXRoIGQ9Ik0zMiAxNC41TDQwIDE4IiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4K';
+        groundImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwIiB2aWV3Qm94PSIwIDAgMTAwIDEwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjNTM1MzUzIi8+CjxwYXRoIGQ9Ik0wIDVIMTAiIHN0cm9rZT0iIzQyNDI0MiIgc3Ryb2tlLXdpZHRoPSIyIi8+Cjwvc3ZnPgo=';
+        moonImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iMzAiIHZpZXdCb3g9IjAgMCAzMCAzMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTUiIGN5PSIxNSIgcj0iMTIiIGZpbGw9IiNGRkZGRkUiIGZpbGwtb3BhY2l0eT0iMC45Ii8+Cjwvc3ZnPgo=';
+        starImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSI4IiB2aWV3Qm94PSIwIDAgOCA4IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjQiIGN5PSI0IiByPSIyIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==';
+        
+        // game state
+        let gameSpeed = 6;
+        let score = 0;
+        let highScore = localStorage.getItem('dinoJumpHighScore') || 0;
+        let gameOver = false;
+        let gameStarted = false;
+        let isPaused = false;
+        let frameCount = 0;
+        let isNightMode = false;
+        let difficulty = 'normal';
+        let comboMultiplier = 1.0;
+        let comboAccumulator = 0;
+        const COMBO_RATE_PER_FRAME = 0.002;
+        const MAX_COMBO = 2.5;
+        
+        let baseGameSpeed = 6;
+        let currentGravity = 0.8;
+        let currentJumpForce = -15;
+        let obstacleSpawnGap = 400;
+        
+        const dino = {
+            x: 50, y: 170, width: 44, height: 47,
+            jumping: false, ducking: false, jumpVelocity: 0,
+            gravity: 0.8, jumpForce: -15,
+            update() { if(this.jumping){ this.y += this.jumpVelocity; this.jumpVelocity += this.gravity; if(this.y >= 170){ this.y = 170; this.jumping = false; this.jumpVelocity = 0; } } },
+            jump() { if(!this.jumping && !this.ducking && !gameOver && gameStarted && !isPaused) { this.jumping = true; this.jumpVelocity = this.jumpForce; safeVibrate(18); titleElem.style.transform = 'scale(1.02)'; setTimeout(()=>titleElem.style.transform='',120); } },
+            duck(isDucking) { if(!this.jumping && gameStarted && !isPaused && !gameOver) { this.ducking = isDucking; this.height = isDucking ? 27 : 47; this.y = isDucking ? 190 : 170; } },
+            draw() {
+                ctx.drawImage(dinoImg, this.x, this.y, this.width, this.height);
+                if(!this.jumping && !this.ducking){ let legOffset = Math.sin(frameCount * 0.2) * 3; ctx.fillStyle = '#535353'; ctx.fillRect(this.x+5, this.y+this.height, 6, 15+legOffset); ctx.fillRect(this.x+this.width-11, this.y+this.height,6,15-legOffset); }
+                ctx.fillStyle = '#FFF'; if(this.jumping){ ctx.fillRect(this.x+10, this.y+12, 8,6); ctx.fillRect(this.x+26, this.y+12, 8,6); } else { ctx.fillRect(this.x+10, this.y+10,8,4); ctx.fillRect(this.x+26, this.y+10,8,4); }
+                ctx.fillStyle = '#333'; ctx.fillRect(this.x+12, this.y+(this.jumping?13:11),4,2); ctx.fillRect(this.x+28, this.y+(this.jumping?13:11),4,2);
+            }
+        };
+        
+        class Obstacle {
+            constructor(type) { this.x = canvas.width; this.type = type; this.passed=false;
+                if(type === 'cactus'){ const arr=[cactus1Img,cactus2Img,cactus3Img]; this.image=arr[Math.floor(Math.random()*arr.length)]; this.width=20+Math.random()*20; this.height=40+Math.random()*10; this.y=170+(47-this.height); }
+                else { this.image = birdImg; this.width=40; this.height=25; this.y=135+Math.random()*60; } }
+            draw() { if(this.type==='bird'){ let w=Math.sin(Date.now()*0.012)*2; ctx.drawImage(this.image, this.x, this.y+w, this.width, this.height); } else ctx.drawImage(this.image, this.x, this.y, this.width, this.height); ctx.fillStyle='rgba(0,0,0,0.1)'; ctx.fillRect(this.x+2, this.y+2, this.width, this.height); }
+            update() { this.x -= gameSpeed; return this.x < -this.width; }
+            getHitbox() { if(this.type==='bird') return { x: this.x+5, y: this.y+5, width: this.width-10, height: this.height-10 };
+                          return { x: this.x+3, y: this.y+3, width: this.width-6, height: this.height-6 }; }
+        }
+        
+        let obstacles = [], clouds = [], stars = [], groundX = 0;
+        for(let i=0;i<40;i++) stars.push({ x: Math.random()*800, y: Math.random()*150, size:1+Math.random()*2, twinkle: Math.random()*6.28 });
+        
+        function drawBackground(){
+            if(difficulty === 'hard' && gameStarted){ let grad=ctx.createLinearGradient(0,0,0,canvas.height); grad.addColorStop(0,'#6f1818'); grad.addColorStop(1,'#2c0505'); ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(0,0,canvas.width,canvas.height);}
+            else if(isNightMode){ let grad=ctx.createLinearGradient(0,0,0,canvas.height); grad.addColorStop(0,'#0a0a2a'); grad.addColorStop(1,'#1a1a4a'); ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height); if(difficulty==='hard') ctx.fillStyle='rgba(150,30,30,0.4)', ctx.fillRect(0,0,canvas.width,canvas.height);}
+            else { let grad=ctx.createLinearGradient(0,0,0,canvas.height); grad.addColorStop(0,'#9ad7f5'); grad.addColorStop(1,'#eef9ff'); ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);}
+            if(isNightMode && difficulty!=='hard') ctx.drawImage(moonImg, canvas.width-100, 30, 30, 30);
+            stars.forEach(s=>{ ctx.globalAlpha = 0.5+Math.sin(s.twinkle+frameCount*0.05)*0.4; ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; });
+        }
+        function drawGround(){ ctx.fillStyle = (difficulty === 'hard' && gameStarted) ? '#4e1a1a' : (isNightMode ? '#424242' : '#535353'); ctx.fillRect(0,217,canvas.width,2); ctx.fillStyle = (difficulty === 'hard' && gameStarted) ? '#6e2a2a' : (isNightMode ? '#424242' : '#535353'); for(let i=0;i<canvas.width/20+1;i++) if((i+Math.floor(groundX/20))%2===0) ctx.fillRect(i*20-(groundX%20),217,10,2); }
+        function safeVibrate(p){ if(navigator.vibrate) navigator.vibrate(p); }
+        function applyDifficultySettings(){
+            if(difficulty === 'easy'){ baseGameSpeed=4; currentGravity=0.7; currentJumpForce=-14.5; obstacleSpawnGap=550; }
+            else if(difficulty === 'normal'){ baseGameSpeed=6; currentGravity=0.8; currentJumpForce=-15; obstacleSpawnGap=400; }
+            else { baseGameSpeed=8; currentGravity=1.0; currentJumpForce=-13.5; obstacleSpawnGap=280; }
+            if(!gameOver && gameStarted) gameSpeed = baseGameSpeed;
+            dino.gravity = currentGravity; dino.jumpForce = currentJumpForce;
+        }
+        function updateComboDisplay(){ comboValueSpan.innerText = `x${comboMultiplier.toFixed(2)}`; comboWrapper.classList.add('combo-blink'); setTimeout(()=>comboWrapper.classList.remove('combo-blink'),150); }
+        function resetCombo(){ comboMultiplier=1.0; comboAccumulator=0; updateComboDisplay(); }
+        
+        function updateScoreWithCombo(){
+            if(!gameStarted || gameOver || isPaused) return;
+            if(frameCount % 5 === 0){
+                let add = Math.max(1, Math.floor(1 * comboMultiplier));
+                score += add;
+                scoreSpan.textContent = String(score).padStart(5,'0');
+                if(score % 100 === 0) safeVibrate(40);
+                if(score % 100 === 0) scoreSpan.style.transform='scale(1.2)', setTimeout(()=>scoreSpan.style.transform='',200);
+                if(score % 200 === 0 && gameSpeed < 18) gameSpeed += 0.4;
+                if(score % 700 === 0){ isNightMode = !isNightMode; canvas.style.filter='brightness(0.95)'; setTimeout(()=>canvas.style.filter='',300); }
+            }
+        }
+        
+        function generateObstacle(){
+            if(obstacles.length===0 || obstacles[obstacles.length-1].x < canvas.width - obstacleSpawnGap){
+                let type = Math.random() > 0.7 ? 'bird' : 'cactus';
+                if(score < 100) type = 'cactus';
+                if(score > 400 && difficulty === 'hard') type = Math.random() > 0.55 ? 'bird' : 'cactus';
+                obstacles.push(new Obstacle(type));
+            }
+        }
+        function checkCollision(r1,r2){ return !(r2.x > r1.x+r1.width || r2.x+r2.width < r1.x || r2.y > r1.y+r1.height || r2.y+r2.height < r1.y); }
+        function checkCollisions(){
+            if(!gameStarted || gameOver) return false;
+            const dinoHit = { x: dino.x+8, y: dino.y+8, width: dino.width-16, height: dino.height-(dino.ducking?20:16) };
+            for(let ob of obstacles) if(checkCollision(dinoHit, ob.getHitbox())){ safeVibrate([80,30,80]); canvas.style.transform='translateX(3px)'; setTimeout(()=>canvas.style.transform='translateX(-3px)',40); setTimeout(()=>canvas.style.transform='',80); endGame(); return true; }
+            return false;
+        }
+        function endGame(){
+            gameOver=true; gameStarted=false; isPaused=false;
+            if(score > highScore){ highScore = score; localStorage.setItem('dinoJumpHighScore',highScore); highScoreSpan.innerText = `HI: ${String(highScore).padStart(5,'0')}`; }
+            finalScoreSpan.textContent = String(score).padStart(5,'0');
+            highScoreFinalSpan.textContent = String(highScore).padStart(5,'0');
+            gameOverDiv.style.display = 'block';
+            canvas.style.filter = 'grayscale(0.2)';
+            comboMultiplier = 1.0;
+        }
+        function resetGame(){
+            score=0; gameSpeed=baseGameSpeed; frameCount=0; obstacles=[]; gameOver=false; isPaused=false; isNightMode=false;
+            dino.y=170; dino.jumping=false; dino.ducking=false; dino.height=47;
+            scoreSpan.textContent='00000'; gameOverDiv.style.display='none'; canvas.style.filter='none';
+            gameStarted=true; resetCombo(); pauseOverlay.style.display='none'; applyDifficultySettings();
+            gameSpeed = baseGameSpeed;
+        }
+        function togglePause(){ if(!gameStarted || gameOver) return; isPaused=!isPaused; pauseOverlay.style.display = isPaused ? 'flex' : 'none'; }
+        function toggleFullscreen(){ if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e=>console.warn); else document.exitFullscreen(); }
+        function setDifficulty(level){
+            difficulty = level; applyDifficultySettings();
+            if(!gameStarted || gameOver){ if(gameOver) resetGame(); else gameStarted=false; }
+            document.querySelectorAll('.difficulty-btn').forEach(btn=>{ if(btn.dataset.diff === level) btn.classList.add('active'); else btn.classList.remove('active'); });
+        }
+        
+        function gameLoop(){
+            if(!gameOver && gameStarted && !isPaused){
+                comboAccumulator += COMBO_RATE_PER_FRAME;
+                if(comboAccumulator >= 0.08 && comboMultiplier < MAX_COMBO){ comboMultiplier = Math.min(MAX_COMBO, comboMultiplier+0.04); comboAccumulator=0; updateComboDisplay(); }
+                dino.update(); generateObstacle(); updateScoreWithCombo(); obstacles = obstacles.filter(ob => !ob.update()); checkCollisions(); groundX += gameSpeed;
+                if(Math.random()<0.008 && clouds.length<4) clouds.push({ x:canvas.width, y:30+Math.random()*70, width:60+Math.random()*40, height:20, speed:1+Math.random()*2 });
+                clouds = clouds.filter(c=>{ c.x-=c.speed; if(c.x<-c.width) return false; ctx.fillStyle=isNightMode?'rgba(220,240,255,0.6)':'rgba(255,255,245,0.85)'; ctx.beginPath(); ctx.arc(c.x+c.width/4, c.y+c.height/2, c.height/2,0,Math.PI*2); ctx.arc(c.x+c.width/2, c.y+c.height/2, c.height/1.5,0,Math.PI*2); ctx.arc(c.x+c.width*3/4, c.y+c.height/2, c.height/2,0,Math.PI*2); ctx.fill(); return true; });
+            }
+            drawBackground(); drawGround(); dino.draw(); obstacles.forEach(ob=>ob.draw());
+            if(!gameStarted && !gameOver){
+                ctx.fillStyle='#e67e22'; ctx.font='bold 28px "Courier New"'; ctx.textAlign='center'; ctx.fillText('DINO JUMP',canvas.width/2,canvas.height/2-30);
+                ctx.fillStyle='#ddd'; ctx.font='bold 16px monospace'; ctx.fillText('PRESS SPACE  |  SELECT DIFFICULTY',canvas.width/2,canvas.height/2+30);
+                ctx.font='12px monospace'; ctx.fillStyle='#bbb'; ctx.fillText('Jump / Duck to survive',canvas.width/2,canvas.height/2+75);
+            }
+            if(gameStarted && !gameOver){
+                ctx.fillStyle='#f5bc70'; ctx.font='bold 14px monospace'; ctx.textAlign='left'; ctx.fillText(`SPEED: ${gameSpeed.toFixed(1)}`, 20,32);
+                ctx.fillStyle= comboMultiplier>1.3?'#ffaa44':'#ffe3b0'; ctx.font='bold 14px monospace'; ctx.fillText(`COMBO x${comboMultiplier.toFixed(1)}`, 20,58);
+            }
+            if(isPaused && gameStarted && !gameOver){
+                ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle='#ffc857'; ctx.font='bold 34px monospace'; ctx.textAlign='center'; ctx.fillText('PAUSED', canvas.width/2, canvas.height/2);
+            }
+            requestAnimationFrame(gameLoop);
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            if(e.code === 'KeyP'){ e.preventDefault(); togglePause(); return; }
+            if(!isPaused && !gameOver){
+                if(e.code === 'Space' || e.code === 'ArrowUp'){ e.preventDefault(); if(!gameStarted) resetGame(); else dino.jump(); }
+                if(e.code === 'ArrowDown') dino.duck(true);
+            }
+            if(e.code === 'Space' && gameOver){ resetGame(); e.preventDefault(); }
+        });
+        document.addEventListener('keyup', (e) => { if(e.code === 'ArrowDown') dino.duck(false); });
+        restartBtn.addEventListener('click', resetGame);
+        pauseBtn.addEventListener('click', togglePause);
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        document.querySelectorAll('.difficulty-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ setDifficulty(btn.dataset.diff); if(gameOver) resetGame(); else if(!gameStarted) gameStarted=false; }); });
+        canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); if(!gameStarted) resetGame(); else dino.jump(); });
+        canvas.addEventListener('touchmove',(e)=>{ let ty=e.touches[0].clientY; if(ty>window.innerHeight-100) dino.duck(true); else dino.duck(false); });
+        canvas.addEventListener('touchend',()=>dino.duck(false));
+        
+        highScoreSpan.innerText = `HI: ${String(highScore).padStart(5,'0')}`;
+        applyDifficultySettings();
+        gameLoop();
+    })();
+</script>
+</body>
+</html>
